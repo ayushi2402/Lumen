@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+
+html,
+body {
+  @apply bg-ink-50 text-ink-900 antialiased;
+}
+
+/* Tabular figures keep prices from jittering as digits change. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-ink-200 bg-white shadow-card;
+  }
+
+  .card-hover {
+    @apply transition-shadow duration-150 hover:shadow-lift;
+  }
+
+  .label {
+    @apply text-xs font-medium uppercase tracking-wide text-ink-400;
+  }
+
+  /* Each button variant repeats the base rules rather than @apply-ing .btn,
+     because @apply of another custom component class is fragile. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           text-sm font-medium transition-colors disabled:cursor-not-allowed
+           disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           text-sm font-medium transition-colors disabled:cursor-not-allowed
+           disabled:opacity-50 bg-ink-900 text-white hover:bg-ink-800;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           text-sm font-medium transition-colors disabled:cursor-not-allowed
+           disabled:opacity-50 border border-ink-200 bg-white text-ink-900
+           hover:bg-ink-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           text-sm font-medium transition-colors disabled:cursor-not-allowed
+           disabled:opacity-50 text-ink-500 hover:bg-ink-100 hover:text-ink-900;
+  }
+}

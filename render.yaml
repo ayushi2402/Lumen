@@ -1,0 +1,75 @@
+# Render Blueprint for the LUMEN backend (free tier).
+#
+# Database is Supabase PostgreSQL, NOT Render Postgres - set DATABASE_URL
+# manually in the Render dashboard to your Supabase connection string.
+#
+# Render's free filesystem is ephemeral and the instance sleeps when idle.
+# LUMEN is built for both: no application state is kept on disk, and every API
+# request rebuilds what it needs, so a cold wake serves correct data without
+# waiting for the background poller.
+
+services:
+  - type: web
+    name: lumen-backend
+    runtime: python
+    plan: free
+    region: singapore # closest free region to NSE; any region works
+    rootDir: backend
+
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+
+    # Migrations run at boot. Safe here because the free tier runs a single
+    # instance; with multiple instances migrations belong in a release step.
+    startCommand: >-
+      alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    # /health answers without a database, market data, Google or Groq, so a
+    # cold instance passes its health check immediately.
+    healthCheckPath: /health
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.1"
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+
+      # Signing key for LUMEN session tokens. Generated once by Render.
+      - key: SESSION_SECRET
+        generateValue: true
+
+      # --- Set these yourself in the Render dashboard -----------------------
+      # Supabase Postgres connection string (Session pooler, port 5432).
+      - key: DATABASE_URL
+        sync: false
+      # Your deployed Vercel URL, e.g. https://lumen.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+
+      # --- Optional. The app works fully without every one of these ---------
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DEBUG_API_TOKEN
+        sync: false
+
+      # --- Market data ------------------------------------------------------
+      # NSE first, Yahoo as fallback. Upstox is deliberately absent: it is not
+      # required and needs a daily-expiring token.
+      # Note: NSE frequently blocks datacentre IPs, so on Render the chain will
+      # usually resolve to yfinance. That is expected and handled.
+      - key: MARKET_PROVIDER_CHAIN
+        value: jugaad,yfinance
+      # Guarantees the demo works even with zero market access.
+      - key: ALLOW_REPLAY_FALLBACK
+        value: "true"
+
+      # --- Background polling ----------------------------------------------
+      # Only polls while NSE is open; idles otherwise.
+      - key: ENABLE_BACKGROUND_POLLING
+        value: "true"
+      - key: POLLING_INTERVAL_SECONDS
+        value: "45"

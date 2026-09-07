@@ -1,0 +1,112 @@
+# ---------------------------------------------------------------------------
+# Secrets & environment
+# ---------------------------------------------------------------------------
+.env
+.env.*
+# Templates must stay tracked: a fresh clone needs them, and they contain
+# placeholders only. This covers .env.example and frontend/.env.local.example.
+!.env.example
+!**/*.env.example
+!**/.env*.example
+*.pem
+*.key
+secrets/
+# Upstox tokens are short-lived but are still credentials. Never commit them.
+*token*.json
+
+# ---------------------------------------------------------------------------
+# Python / FastAPI
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib60/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.conda/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+.tox/
+.nox/
+
+# ---------------------------------------------------------------------------
+# Node / Next.js / frontend
+# ---------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+.next/
+out/
+.turbo/
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Databases & local data
+# ---------------------------------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+redisdata/
+
+# ---------------------------------------------------------------------------
+# Editors & OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# Logs & scratch
+# ---------------------------------------------------------------------------
+logs/
+*.log
+tmp/
+scratch/

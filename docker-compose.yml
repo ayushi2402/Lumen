@@ -1,0 +1,58 @@
+# ===========================================================================
+# LUMEN - local development datastores
+# ---------------------------------------------------------------------------
+# Provides PostgreSQL and Redis only. Application services (backend/frontend)
+# are intentionally NOT containerised yet - they are run directly on the host
+# during development for faster iteration.
+#
+# Usage (requires Docker Desktop to be running):
+#   docker compose up -d
+#   docker compose ps
+#   docker compose down          # stop, keep data
+#   docker compose down -v       # stop, DELETE data volumes
+#
+# STATUS: not yet verified on this machine - the Docker daemon was not
+# running at project setup time. See "Known limitations" in README.md.
+# ===========================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lumen-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lumen
+      POSTGRES_PASSWORD: lumen
+      POSTGRES_DB: lumen
+    ports:
+      - "5432:5432"
+    volumes:
+      # Named volume rather than a bind mount - avoids Windows filesystem
+      # permission problems with the Postgres data directory.
+      - lumen_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumen -d lumen"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: lumen-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    # Append-only persistence so cached quotes survive a restart during
+    # development. Redis remains a cache, never the source of truth.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - lumen_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lumen_pgdata:
+  lumen_redisdata:

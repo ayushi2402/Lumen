@@ -1,0 +1,32 @@
+# LUMEN backend dependencies
+# Python 3.13 compatible. Install into backend/.venv:
+#   .venv/Scripts/python -m pip install -r requirements.txt
+
+# --- API ---
+fastapi>=0.115
+uvicorn[standard]>=0.32
+
+# --- Config & validation ---
+pydantic>=2.9
+pydantic-settings>=2.6
+
+# --- Database (infrastructure only at this stage; no schema yet) ---
+SQLAlchemy>=2.0.36
+psycopg[binary]>=3.2
+alembic>=1.14
+
+# --- Tests ---
+pytest>=8.3
+# Required by fastapi.testclient.TestClient - not optional for the test suite.
+httpx>=0.27
+
+# --- Auth: Google ID token verification + LUMEN session tokens ---
+# PyJWT's PyJWKClient verifies Google's RS256 ID tokens against their JWKS,
+# so no separate google-auth/requests stack is needed.
+PyJWT[crypto]>=2.9
+
+# --- Market data providers (Upstox is NOT required) ---
+# Chain: jugaad (NSE, unofficial scraper) -> yfinance (delayed) -> replay.
+# Both verified working against live data during development.
+yfinance>=1.7
+jugaad-data>=0.35
