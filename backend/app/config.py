@@ -15,7 +15,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote, unquote
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -39,6 +41,69 @@ class Settings(BaseSettings):
     # --- Datastores (optional in development) -------------------------------
     database_url: str | None = None
     redis_url: str | None = None
+
+    # TEMPORARY (demo deployment): acknowledge that SQLite is being used in
+    # production on purpose. PostgreSQL remains fully supported and is still
+    # the correct choice - this only downgrades the health warning from
+    # "misconfigured" to a factual note, so the deployment is transparent
+    # rather than alarming. Remove this once DATABASE_URL points at Postgres.
+    allow_sqlite_in_production: bool = False
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, value: str | None) -> str | None:
+        """Make a provider-issued PostgreSQL URL usable as-is.
+
+        Two things routinely break a copied Supabase/Render/Neon connection
+        string, and both are fixed here so the URL can be pasted unedited:
+
+        1. **Driver.** Providers emit a bare ``postgresql://``, which SQLAlchemy
+           resolves to psycopg2. This project installs only ``psycopg[binary]``
+           v3, so an unedited URL fails with ``ModuleNotFoundError: psycopg2``.
+
+        2. **Credential escaping.** Generated passwords routinely contain
+           ``@``, ``[``, ``]`` and other RFC 3986 reserved characters. Left
+           raw, the URL contains two ``@`` signs and the parser picks the wrong
+           host - producing a baffling DNS error rather than an auth error.
+
+        Deliberately conservative: explicit drivers (``postgresql+asyncpg``),
+        non-PostgreSQL URLs (SQLite in tests) and already-encoded credentials
+        are all left untouched, so this can only fix a URL, never break one.
+        """
+        if not value:
+            return value
+
+        scheme, separator, rest = value.partition("://")
+        if not separator:
+            return value
+
+        # 1. Driver. "postgres" is the legacy alias some providers still emit.
+        if scheme in {"postgres", "postgresql"}:
+            scheme = "postgresql+psycopg"
+        elif not scheme.startswith("postgresql"):
+            return value
+
+        # 2. Credentials. Userinfo is everything before the LAST "@"
+        #    (RFC 3986), which is what makes an unescaped "@" recoverable.
+        userinfo, at_sign, host = rest.rpartition("@")
+        if not at_sign:
+            return f"{scheme}://{rest}"
+
+        # Decode-then-encode, which is idempotent and therefore safe to apply
+        # unconditionally. It normalizes all three states an operator can
+        # produce: never escaped, fully escaped, and - the nastiest - partly
+        # escaped, where someone hand-fixed one character and left the rest.
+        #
+        # The one case this cannot resolve is a password whose literal text
+        # spells a valid escape (a real "%5B"), because a URL genuinely cannot
+        # distinguish that from an encoded "[". Use an alphanumeric password if
+        # that is ever a concern.
+        username, colon, password = userinfo.partition(":")
+        userinfo = quote(unquote(username), safe="")
+        if colon:
+            userinfo += ":" + quote(unquote(password), safe="")
+
+        return f"{scheme}://{userinfo}@{host}"
 
     # --- Market data ---------------------------------------------------------
     # Ordered fallback chain. Upstox is NOT required; it is skipped entirely
@@ -133,7 +198,15 @@ class Settings(BaseSettings):
         if not self.database_url:
             warnings.append("DATABASE_URL is not set.")
         if self.database_url and self.database_url.startswith("sqlite"):
-            warnings.append("SQLite must not be used in production.")
+            if self.allow_sqlite_in_production:
+                # Deliberate, acknowledged demo deployment. Still surfaced, so
+                # nobody mistakes it for a durable database.
+                warnings.append(
+                    "Running on SQLite by configuration (demo deployment): "
+                    "storage is ephemeral and resets on restart."
+                )
+            else:
+                warnings.append("SQLite must not be used in production.")
         if self.debug:
             warnings.append("DEBUG is enabled in production.")
         if not self.cors_origins:

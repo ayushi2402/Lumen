@@ -40,10 +40,20 @@ services:
       - key: SESSION_SECRET
         generateValue: true
 
-      # --- Set these yourself in the Render dashboard -----------------------
-      # Supabase Postgres connection string (Session pooler, port 5432).
+      # --- TEMPORARY DEMO DATABASE -----------------------------------------
+      # SQLite so the public demo can ship without a Postgres dependency.
+      # Render's free disk is EPHEMERAL: this resets on every restart/redeploy,
+      # which is fine here because instruments re-seed on startup and demo
+      # users are created on demand.
+      #
+      # TO SWITCH TO SUPABASE: delete these two entries and restore
+      #   - key: DATABASE_URL
+      #     sync: false
+      # then set the Postgres URL in the Render dashboard.
       - key: DATABASE_URL
-        sync: false
+        value: sqlite:///./lumen_demo.db
+      - key: ALLOW_SQLITE_IN_PRODUCTION
+        value: "true"
       # Your deployed Vercel URL, e.g. https://lumen.vercel.app
       - key: CORS_ORIGINS
         sync: false
@@ -70,6 +80,6 @@ services:
       # --- Background polling ----------------------------------------------
       # Only polls while NSE is open; idles otherwise.
       - key: ENABLE_BACKGROUND_POLLING
-        value: "true"
+        value: "false"
       - key: POLLING_INTERVAL_SECONDS
         value: "45"

@@ -420,3 +420,73 @@ def test_chain_falls_through_when_nse_declines_a_large_batch() -> None:
     response = chain.get_quotes([f"NSE_EQ|SYM{i}" for i in range(20)])
     assert response.provider == "yfinance"
     assert any("jugaad" in attempt for attempt in chain.attempts)
+
+
+# ---------------------------------------------------------------------------
+# DATABASE_URL normalization
+# ---------------------------------------------------------------------------
+
+
+def test_bare_postgres_url_is_pinned_to_the_installed_driver() -> None:
+    """Providers emit `postgresql://`, which SQLAlchemy maps to psycopg2.
+
+    Only psycopg 3 is installed, so an unedited Supabase/Render URL would die
+    with ModuleNotFoundError before it ever reached the database.
+    """
+    for raw in ("postgresql://u:p@h:5432/d", "postgres://u:p@h:5432/d"):
+        assert Settings(database_url=raw).database_url.startswith(
+            "postgresql+psycopg://"
+        )
+
+
+def test_reserved_characters_in_the_password_are_percent_encoded() -> None:
+    """A generated password containing '@', '[' or ']' must not corrupt the host.
+
+    Left raw, the URL has two '@' signs and the parser picks the wrong host,
+    surfacing as a DNS failure rather than an auth failure.
+    """
+    normalized = Settings(
+        database_url="postgresql://postgres.ref:pa@ss[123]@db.example.com:5432/postgres"
+    ).database_url
+
+    assert normalized.endswith("@db.example.com:5432/postgres")
+    assert normalized.count("@") == 1
+    assert "%40" in normalized and "%5B" in normalized and "%5D" in normalized
+
+
+def test_already_encoded_credentials_are_not_double_encoded() -> None:
+    raw = "postgresql://u:already%40enc@h:5432/d"
+    assert Settings(database_url=raw).database_url == (
+        "postgresql+psycopg://u:already%40enc@h:5432/d"
+    )
+
+
+def test_partly_encoded_password_is_normalized() -> None:
+    """The nastiest real case: someone hand-escapes one character.
+
+    A half-fixed password leaves stray reserved characters that silently
+    corrupt the host, so all three states must converge on the same URL.
+    """
+    expected = "postgresql+psycopg://u:pa%40ss%5B1%5D@h:5432/d"
+    for raw in (
+        "postgresql://u:pa@ss[1]@h:5432/d",           # never escaped
+        "postgresql://u:pa%40ss%5B1%5D@h:5432/d",     # fully escaped
+        "postgresql://u:pa@ss%5B1]@h:5432/d",         # partly escaped
+    ):
+        assert Settings(database_url=raw).database_url == expected
+
+
+def test_normalization_is_idempotent() -> None:
+    once = Settings(database_url="postgresql://u:pa@ss[1]@h:5432/d").database_url
+    assert Settings(database_url=once).database_url == once
+
+
+def test_normalization_leaves_other_urls_untouched() -> None:
+    """It can only fix a URL, never break one."""
+    for raw in (
+        "sqlite:///./test.db",
+        "postgresql+asyncpg://u:p@h:5432/d",
+        "mysql://u:p@h/d",
+    ):
+        assert Settings(database_url=raw).database_url == raw
+    assert Settings(database_url=None).database_url is None
